@@ -6,7 +6,7 @@ df_I = pd.read_hdf(output_file, key='/I').reset_index()
 df_RB = pd.read_hdf(output_file, key='/RB').reset_index()
 class St(bt.Strategy):
     def __init__(self):
-        self.sma = bt.indicators.SimpleMovingAverage(self.data)
+        self.sma = bt.indicators.SimpleMovingAverage(self.data,subplot =True)
 
 
 data =bt.feeds.PandasData(dataname=df_I,
