@@ -977,10 +977,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         if not plotter:
             from . import plot
-            if self.p.oldsync:
-                plotter = plot.Plot_OldSync(**kwargs)
-            else:
-                plotter = plot.Plot(**kwargs)
+            # if self.p.oldsync:
+            #     plotter = plot.Plot_OldSync(**kwargs)
+            # else:
+            #     plotter = plot.Plot(**kwargs)
+            plotter = plot.Plot_OldSync(**kwargs)
 
         # pfillers = {self.datas[i]: self._plotfillers[i]
         # for i, x in enumerate(self._plotfillers)}
