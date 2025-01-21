@@ -47,6 +47,9 @@ from .tradingcal import (TradingCalendarBase, TradingCalendar,
                          PandasMarketCalendar)
 from .timer import Timer
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="libpng warning: tRNS: invalid with alpha channel")
+
 # Defined here to make it pickable. Ideally it could be defined inside Cerebro
 
 

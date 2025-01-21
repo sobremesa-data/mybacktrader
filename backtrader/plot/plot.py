@@ -96,11 +96,19 @@ class PInfo(object):
 
 
 class Plot_OldSync(with_metaclass(MetaParams, object)):
-    params = (('scheme', PlotScheme()),)
+    params = (('scheme', PlotScheme()),
+            ('spread', False),  # 添加spread参数
+                      )
 
     def __init__(self, **kwargs):
+
+
+        if 'spread' in kwargs:
+            self.p.spread = kwargs.pop('spread')  # 使用self.p.spread而不是self.spread
+            
         for pname, pvalue in kwargs.items():
             setattr(self.p.scheme, pname, pvalue)
+            
         if not hasattr(self.p.scheme, 'locbg'):
             setattr(self.p.scheme, 'locbg', 'white')
             setattr(self.p.scheme, 'locbgother', 'white')
@@ -135,8 +143,30 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
         self.mpyplot = mpyplot
 
         self.pinf = PInfo(self.p.scheme)
-        self.sortdataindicators(strategy)
-        self.calcrows(strategy)
+        if self.p.spread:
+            # 备份原始数据
+            original_datas = strategy.datas
+            
+            try:
+                # 创建只包含spread的临时列表
+                spread_data = [data for data in strategy.datas if data._name == 'spread']
+                if not spread_data:
+                    raise ValueError("No spread data found")
+                
+                # 替换datas列表
+                strategy.datas = spread_data
+                
+                # 执行排序和计算
+                self.sortdataindicators(strategy)
+                self.calcrows(strategy)
+                
+            finally:
+                # 恢复原始数据
+                strategy.datas = original_datas
+        else:
+            # 正常模式
+            self.sortdataindicators(strategy)
+            self.calcrows(strategy)
 
         st_dtime = strategy.lines.datetime.plot()
         if start is None:
@@ -195,6 +225,11 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
             # Create the rest on a per data basis
             dt0, dt1 = self.pinf.xreal[0], self.pinf.xreal[-1]
             for data in strategy.datas:
+
+                # spread 模式下只绘制spread
+                if self.p.spread and data._name != 'spread':
+                    continue
+
                 if not data.plotinfo.plot:
                     continue
 
@@ -213,6 +248,9 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
                     self.pinf.xstart = bisect.bisect_left(dts, xtemp[0])
                     self.pinf.xend = bisect.bisect_right(dts, xtemp[-1])
 
+
+                self.plotdata(data, self.dplotsover[data])
+
                 for ind in self.dplotsup[data]:
                     self.plotind(
                         data,
@@ -221,15 +259,8 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
                         upinds=self.dplotsup[ind],
                         downinds=self.dplotsdown[ind])
 
-                self.plotdata(data, self.dplotsover[data])
 
-                for ind in self.dplotsdown[data]:
-                    self.plotind(
-                        data,
-                        ind,
-                        subinds=self.dplotsover[ind],
-                        upinds=self.dplotsup[ind],
-                        downinds=self.dplotsdown[ind])
+
 
             cursor = MultiCursor(
                 fig.canvas, list(self.pinf.daxis.values()),
@@ -466,6 +497,7 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
 
             pltmethod = getattr(ax, lineplotinfo._get('_method', 'plot'))
 
+
             xdata, lplotarray = self.pinf.xdata, lplot
             if lineplotinfo._get('_skipnan', False):
                 # Get the full array and a mask to skipnan
@@ -475,6 +507,8 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
                 # Get both the axis and the data masked
                 lplotarray = lplotarray[lplotmask]
                 xdata = np.array(xdata)[lplotmask]
+
+  
 
             plottedline = pltmethod(xdata, lplotarray, **plotkwargs)
             try:
@@ -759,7 +793,9 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
                     ax.set_ylim(axbot, axtop)
 
         for ind in indicators:
+
             self.plotind(data, ind, subinds=self.dplotsover[ind], masterax=ax)
+
 
         handles, labels = ax.get_legend_handles_labels()
         a = axdatamaster or ax

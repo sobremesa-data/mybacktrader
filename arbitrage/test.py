@@ -35,5 +35,5 @@ cerebro.adddata(data0, name='STOCK1')
 cerebro.adddata(data1, name='STOCK2')
 cerebro.addstrategy(MyStrategy)
 cerebro.run(oldsync = True)
-cerebro.plot()
+cerebro.plot(numfigs=5)
 
