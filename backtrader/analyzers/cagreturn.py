@@ -88,7 +88,7 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
 
             # 累乘每日收益率
             self._cum_return *= (1 + daily_return)
-            print(self._cum_return,daily_return)
+
         # 更新初始值（当新的时间段（天、周、月等）开始时，使用当前值作为新的初始值）
         self._value_start = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
 

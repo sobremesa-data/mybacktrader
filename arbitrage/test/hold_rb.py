@@ -1,6 +1,7 @@
-import backtrader as bt
 import pandas as pd
-from myutil import calculate_spread, check_and_align_data
+
+import backtrader as bt
+
 
 # 始终持有螺纹钢策略
 class AlwaysHoldRBStrategy(bt.Strategy):
@@ -13,20 +14,16 @@ class AlwaysHoldRBStrategy(bt.Strategy):
         self.order = None
         
     def next(self):
-        # 始终持有螺纹钢，不做任何交易
-        # 初始时买入螺纹钢
-        # self.buy(data=self.data0, size=self.p.size_rb,price=self.data0.close[0])  # 买1手螺纹钢
-        # print(self.broker.getvalue(),self.data0.close[0],self.data0.datetime.datetime())
 
         if not self.position:  # 如果没有持仓，则买入
             self.order = self.buy(data=self.data0, size=self.p.size_rb, price=self.data0.close[0])  # 买1手螺纹钢
-            print(f"下单价格: {self.data0.close[0]}, 时间: {self.data0.datetime.datetime()}, 持仓: {self.position}")
+            # print(f"下单价格: {self.data0.close[0]}, 时间: {self.data0.datetime.datetime()}, 持仓: {self.position}")
 
-    
-    def notify_order(self, order):
-        # 订单状态通知
-        if order.status in [order.Completed, order.Canceled, order.Margin]:
-            self.order = None
+    #
+    # def notify_order(self, order):
+    #     # 订单状态通知
+    #     if order.status in [order.Completed, order.Canceled, order.Margin]:
+    #         self.order = None
 
 
 # 读取数据
@@ -47,7 +44,6 @@ cerebro = bt.Cerebro()
 
 cerebro.adddata(data1, name='RB')
 
-
 # 添加策略
 cerebro.addstrategy(AlwaysHoldRBStrategy)
 
@@ -60,16 +56,13 @@ cerebro.addanalyzer(bt.analyzers.SharpeRatio,
                     riskfreerate=0,            # 默认年化1%的风险无风险利率
                     annualize=True,           # 不进行年化
 
-
                     ) 
 cerebro.addanalyzer(bt.analyzers.AnnualReturn)      
 cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
-cerebro.addanalyzer(bt.analyzers.Returns,
-                    # timeframe=bt.TimeFrame.Days,  # 按日数据计算
-                    tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
-                    )  # 自定义名称
+# cerebro.addanalyzer(bt.analyzers.Returns,
+#                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
+#                     )  # 自定义名称
 
-# 添加CAGR分析器
 cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
 # 运行回测
 results = cerebro.run()
@@ -78,13 +71,15 @@ results = cerebro.run()
 sharpe = results[0].analyzers.sharperatio.get_analysis()
 drawdown = results[0].analyzers.drawdown.get_analysis()
 annual_returns = results[0].analyzers.annualreturn.get_analysis()
-total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
+# total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
 cagr = results[0].analyzers.cagranalyzer.get_analysis()
-print(cagr)
+
 # 打印分析结果
-print(f"\n夏普比率: {sharpe['sharperatio']}")
-print(f"最大回撤: {drawdown['max']['drawdown']} %")
-print(f"总回报率: {total_returns['rnorm100']:.2f}%")  # 打印总回报率
+print("=============回测结果================")
+print(f"\n夏普比率: {sharpe['sharperatio']:.2f}")
+print(f"最大回撤: {drawdown['max']['drawdown']:.2f} %")
+# print(f"总回报率: {total_returns['rnorm100']:.2f}%")  # 打印总回报率
+print(f"年化收益: {cagr['cagr100']:.2f} %")
 
 # 打印年度回报率
 print("\n年度回报率:")
@@ -94,4 +89,4 @@ for year, return_rate in annual_returns.items():
     print("{:<8} {:<12.2%}".format(year, return_rate))
 
 # 绘制结果
-# cerebro.plot(volume=False)
+cerebro.plot(volume=False)

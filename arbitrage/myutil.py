@@ -31,19 +31,24 @@ def check_and_align_data(df1, df2, date_column='date'):
     return df1_aligned, df2_aligned
 
 # 2. 计算价差
-def calculate_spread(df_I, df_RB, columns=['open', 'high', 'low', 'close', 'volume']):
+def calculate_spread(df1, df2, columns=['open', 'high', 'low', 'close', 'volume'], factor1=5,factor2=1):
     """
     计算两个DataFrame之间的价差
+    :param df1: 第一个DataFrame
+    :param df2: 第二个DataFrame
+    :param columns: 需要计算价差的列
+    :param factor: 价差计算时的乘数因子
+    :return: 包含价差的DataFrame
     """
     # 对齐数据
-    df_I_aligned, df_RB_aligned = check_and_align_data(df_I, df_RB)
-    
+    df1_aligned, df2_aligned = check_and_align_data(df1, df2)
+
     # 创建价差DataFrame
-    df_spread = pd.DataFrame(index=df_I_aligned.index)
-    
+    df_spread = pd.DataFrame(index=df1_aligned.index)
+
     # 对每个列进行相减
     for col in columns:
-        if col in df_I_aligned.columns and col in df_RB_aligned.columns:
-            df_spread[f'{col}'] = 5*df_I_aligned[col] - df_RB_aligned[col]
-    
+        if col in df1_aligned.columns and col in df2_aligned.columns:
+            df_spread[f'{col}'] = factor1 * df1_aligned[col] - factor2*df2_aligned[col]
+
     return df_spread.reset_index()

@@ -1,6 +1,9 @@
 import backtrader as bt
 import pandas as pd
-from myutil import calculate_spread,check_and_align_data
+import sys
+import os
+
+from arbitrage.myutil import calculate_spread,check_and_align_data
 # 布林带策略
 class SpreadBollingerStrategy(bt.Strategy):
     params = (
@@ -81,7 +84,7 @@ class SpreadBollingerStrategy(bt.Strategy):
             self.order = None
 
 
-# 使用示例
+
 # 读取数据
 output_file = 'D:\\FutureData\\ricequant\\1d_2017to2024_noadjust.h5'
 df_I = pd.read_hdf(output_file, key='/I').reset_index()
@@ -89,7 +92,8 @@ df_RB = pd.read_hdf(output_file, key='/RB').reset_index()
 
 # 计算价差
 # df_I, df_RB = check_and_align_data(df_I, df_RB)
-df_spread = calculate_spread(df_I, df_RB)
+## i:rb = 5:1
+df_spread = calculate_spread(df_I, df_RB,5,1 )
 
 print(f"价差数据形状: {df_spread.shape}")
 
@@ -107,20 +111,24 @@ cerebro.adddata(data2, name='spread')
 
 # 添加策略
 cerebro.addstrategy(SpreadBollingerStrategy)
-
+##########################################################################################
 # 设置初始资金
 cerebro.broker.setcash(1000000.0)
 
 # 添加分析器：SharpeRatio、DrawDown、AnnualReturn 和 Returns
-cerebro.addanalyzer(bt.analyzers.SharpeRatio, 
+cerebro.addanalyzer(bt.analyzers.SharpeRatio,
                     timeframe=bt.TimeFrame.Days,  # 按日数据计算
                     riskfreerate=0,            # 默认年化1%的风险无风险利率
-                    annualize=False,              # 不进行年化
-                    ) 
-cerebro.addanalyzer(bt.analyzers.AnnualReturn)      
-cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
-cerebro.addanalyzer(bt.analyzers.Returns)  # 总回报率分析器
+                    annualize=True,           # 不进行年化
 
+                    )
+cerebro.addanalyzer(bt.analyzers.AnnualReturn)
+cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
+# cerebro.addanalyzer(bt.analyzers.Returns,
+#                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
+#                     )  # 自定义名称
+
+cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
 # 运行回测
 results = cerebro.run()
 
@@ -128,12 +136,15 @@ results = cerebro.run()
 sharpe = results[0].analyzers.sharperatio.get_analysis()
 drawdown = results[0].analyzers.drawdown.get_analysis()
 annual_returns = results[0].analyzers.annualreturn.get_analysis()
-total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
+# total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
+cagr = results[0].analyzers.cagranalyzer.get_analysis()
 
 # 打印分析结果
-print(f"\n夏普比率: {sharpe['sharperatio']}")
-print(f"最大回撤: {drawdown['max']['drawdown']} %")
-print(f"总回报率: {total_returns['rnorm100']:.2f}%")  # 打印总回报率
+print("=============回测结果================")
+print(f"\n夏普比率: {sharpe['sharperatio']:.2f}")
+print(f"最大回撤: {drawdown['max']['drawdown']:.2f} %")
+# print(f"总回报率: {total_returns['rnorm100']:.2f}%")  # 打印总回报率
+print(f"年化收益: {cagr['cagr100']:.2f} %")
 
 # 打印年度回报率
 print("\n年度回报率:")
@@ -143,5 +154,5 @@ for year, return_rate in annual_returns.items():
     print("{:<8} {:<12.2%}".format(year, return_rate))
 
 # 绘制结果
-# cerebro.plot(volume=False, spread=True)
+cerebro.plot(volume=False,spread = True)
 
