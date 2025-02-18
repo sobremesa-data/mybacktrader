@@ -40,9 +40,7 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
 
         # 获取初始值（可以是策略的资产值或者基金值）
         if not self._fundmode:
-            # self._value_start = self.strategy.broker.getvalue()
-            self._value_start = self.strategy.broker._valuemkt
-
+            self._value_start = self.strategy.broker.getvalue()
         else:
             self._value_start = self.strategy.broker.fundvalue
         
@@ -83,22 +81,17 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         # 计算每个时间步骤的收益率
         if self._value_start != 0.0:
 
-
-            # current_value = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
-            current_value = self.strategy.broker._valuemkt if not self._fundmode else self.strategy.broker.fundvalue
-
+            current_value = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
+            # current_value = self.
             daily_return = (current_value / self._value_start) - 1
-
+            
             self._returns.append(daily_return)  # 将当前时间的收益率存储起来
 
             # 累乘每日收益率
             self._cum_return *= (1 + daily_return)
-            print(self._cum_return,self.strategy.broker._valuemkt,daily_return,self.strategy.broker.getvalue(),self._value_start)
-
 
         # 更新初始值（当新的时间段（天、周、月等）开始时，使用当前值作为新的初始值）
-        # self._value_start = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
-        self._value_start = self.strategy.broker._valuemkt if not self._fundmode else self.strategy.broker.fundvalue
+        self._value_start = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
 
     def get_analysis(self):
         '''Returns the CAGR value'''

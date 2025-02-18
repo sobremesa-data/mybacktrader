@@ -31,7 +31,7 @@ def check_and_align_data(df1, df2, date_column='date'):
     return df1_aligned, df2_aligned
 
 # 2. 计算价差
-def calculate_spread(df1, df2, columns=['open', 'high', 'low', 'close', 'volume'], factor1=5,factor2=1):
+def calculate_spread(df1, df2, factor1=5,factor2=1, columns=['open', 'high', 'low', 'close', 'volume']):
     """
     计算两个DataFrame之间的价差
     :param df1: 第一个DataFrame

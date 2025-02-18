@@ -93,7 +93,7 @@ df_RB = pd.read_hdf(output_file, key='/RB').reset_index()
 # 计算价差
 # df_I, df_RB = check_and_align_data(df_I, df_RB)
 ## i:rb = 5:1
-df_spread = calculate_spread(df_I, df_RB,5,1 )
+df_spread = calculate_spread(df_I, df_RB,5,1)
 
 print(f"价差数据形状: {df_spread.shape}")
 
