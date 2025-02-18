@@ -88,7 +88,7 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
             current_value = self.strategy.broker._valuemkt if not self._fundmode else self.strategy.broker.fundvalue
 
             daily_return = (current_value / self._value_start) - 1
-
+            daily_return = 0 if daily_return == -1 else daily_return
             self._returns.append(daily_return)  # 将当前时间的收益率存储起来
 
             # 累乘每日收益率
