@@ -42,3 +42,4 @@ from .logreturnsrolling import *
 from .calmar import *
 from .periodstats import *
 from .cagreturn import *
+from .roi import *

@@ -1,5 +1,6 @@
 import math
 import pandas as pd
+import numpy as np
 import backtrader as bt
 from collections import OrderedDict
 from backtrader import TimeFrameAnalyzerBase
@@ -32,11 +33,6 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         '''Initialize the start value and fundmode'''
         super(CAGRAnalyzer, self).start()
 
-        # 判断fundmode，如果没有设置，使用策略的fundmode
-        if self.p.fund is None:
-            self._fundmode = self.strategy.broker.fundmode
-        else:
-            self._fundmode = self.p.fund
 
         # 获取初始值（可以是策略的资产值或者基金值）
         if not self._fundmode:
@@ -56,12 +52,6 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         '''Calculate CAGR and store results'''
         super(CAGRAnalyzer, self).stop()
 
-        # 获取最终的策略资产值
-        if not self._fundmode:
-            self._value_end = self.strategy.broker.getvalue()
-        else:
-            self._value_end = self.strategy.broker.fundvalue
-
         # 根据传入的周期（如daily）选择年化因子
         annual_factor = self._TANN.get(self.p.period, 252.0)
         
@@ -73,27 +63,34 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
             cagr = (self._cum_return) ** (1 / num_years) - 1
         else:
             cagr = 0.0  # 如果没有数据，设置为0
-
+        #计算sharp self.p.riskfreerate
+        mean_return = np.mean(self._returns) * annual_factor
+        var_return = np.std(self._returns) * np.sqrt(annual_factor)
+        sharpe = mean_return/var_return
         # 存储结果
         self.rets['cagr'] = cagr
         self.rets['cagr100'] = cagr * 100  # 转换为百分比形式
+        self.rets['sharpe'] = sharpe
 
     def next(self):
         '''Calculate returns on each time step'''
         # 计算每个时间步骤的收益率
-        if self._value_start != 0.0:
+
+        # if self._value_start != 0.0:
 
 
-            # current_value = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
-            current_value = self.strategy.broker._valuemkt if not self._fundmode else self.strategy.broker.fundvalue
+        # current_value = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
+        current_value = self.strategy.broker._valuemkt if not self._fundmode else self.strategy.broker.fundvalue
 
-            daily_return = (current_value / self._value_start) - 1
-            daily_return = 0 if daily_return == -1 else daily_return
-            self._returns.append(daily_return)  # 将当前时间的收益率存储起来
+        #分子分母为0
+        daily_return =0 if self._value_start == 0 else  (current_value / self._value_start) - 1
+        daily_return = 0 if daily_return == -1 else daily_return
 
-            # 累乘每日收益率
-            self._cum_return *= (1 + daily_return)
-            print(self._cum_return,self.strategy.broker._valuemkt,daily_return,self.strategy.broker.getvalue(),self._value_start)
+        self._returns.append(daily_return)  # 将当前时间的收益率存储起来
+
+        # 累乘每日收益率
+        self._cum_return *= (1 + daily_return)
+        # print(self._cum_return,daily_return,self.strategy.broker._valuemkt,self.strategy.broker.getvalue(),self.strategy.broker.getcash())
 
 
         # 更新初始值（当新的时间段（天、周、月等）开始时，使用当前值作为新的初始值）

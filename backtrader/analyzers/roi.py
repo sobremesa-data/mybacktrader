@@ -4,8 +4,8 @@ import backtrader as bt
 from collections import OrderedDict
 from backtrader import TimeFrameAnalyzerBase
 
-class CAGRAnalyzer(TimeFrameAnalyzerBase):
-    '''Calculates the Compound Annual Growth Rate (CAGR) for a strategy.
+class ROIAnalyzer(TimeFrameAnalyzerBase):
+    '''Calculates the Compound Annual Growth Rate (roi) for a strategy.
     
     Params:
     
@@ -30,7 +30,7 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
   
     def start(self):
         '''Initialize the start value and fundmode'''
-        super(CAGRAnalyzer, self).start()
+        super(ROIAnalyzer, self).start()
 
         # 判断fundmode，如果没有设置，使用策略的fundmode
         if self.p.fund is None:
@@ -51,8 +51,8 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         self._returns = []
 
     def stop(self):
-        '''Calculate CAGR and store results'''
-        super(CAGRAnalyzer, self).stop()
+        '''Calculate roi and store results'''
+        super(ROIAnalyzer, self).stop()
 
         # 获取最终的策略资产值
         if not self._fundmode:
@@ -66,15 +66,15 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         # 计算总年数
         num_years = len(self._returns) / annual_factor  # 数据长度除以年化因子
         
-        # 计算年化复合增长率（CAGR）
+        # 计算年化复合增长率（roi）
         if num_years > 0:
-            cagr = (self._cum_return) ** (1 / num_years) - 1
+            roi = (self._cum_return) ** (1 / num_years) - 1
         else:
-            cagr = 0.0  # 如果没有数据，设置为0
+            roi = 0.0  # 如果没有数据，设置为0
 
         # 存储结果
-        self.rets['cagr'] = cagr
-        self.rets['cagr100'] = cagr * 100  # 转换为百分比形式
+        self.rets['roi'] = roi
+        self.rets['roi100'] = roi * 100  # 转换为百分比形式
 
     def next(self):
         '''Calculate returns on each time step'''
@@ -94,5 +94,5 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         self._value_start = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
 
     def get_analysis(self):
-        '''Returns the CAGR value'''
+        '''Returns the roi value'''
         return self.rets
