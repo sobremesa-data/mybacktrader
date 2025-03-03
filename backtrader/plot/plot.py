@@ -35,6 +35,8 @@ import matplotlib.dates as mdates
 import matplotlib.font_manager as mfontmgr
 import matplotlib.legend as mlegend
 import matplotlib.ticker as mticker
+
+from ..analyzers import CAGRAnalyzer
 # from matplotlib.gridspec import GridSpec
 
 from ..utils.py3 import range, with_metaclass, string_types, integer_types
@@ -1013,6 +1015,64 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
 #         # 7) 调整布局
 #         fig.subplots_adjust(wspace=0.2)
 
-
-
+# class CustomPlot(Plot_OldSync):
+#     def __init__(self, ** kwargs):
+#         super().__init__(**kwargs)
+#         # 新增独立绘图标识
+#         self.cumulative_ax = None
+#
+#     def calcrows(self, strategy):
+#         super().calcrows(strategy)
+#         # 强制为累计收益保留独立行空间
+#         self.pinf.nrows += max(3, self.pinf.sch.rowsminor)  # 最小3行高度
+#
+#     def plot(self, strategy, figid=0, numfigs=1, iplot=True,  ** kwargs):
+#         # 调用父类方法绘制基础图表
+#         figs = super().plot(strategy, figid, numfigs, iplot,  ** kwargs)
+#
+#         # 获取累计收益分析器
+#         cagr_analyzer = next((a for a in strategy.analyzers
+#                               if isinstance(a, CAGRAnalyzer)), None)
+#         if not cagr_analyzer:
+#             return figs
+#
+#         for fig in figs:
+#
+#         #     # 创建独立坐标系（关键修改点）
+#             grid = (self.pinf.nrows, 1)
+#             self.pinf.row = self.pinf.nrows - self.pinf.sch.rowsminor  # 定位到最后几行
+#             ax = self.newaxis('cumulative', rowspan=self.pinf.sch.rowsminor)
+#         #
+#         # # 初始化坐标系参数
+#             self.pinf.zorder[ax] = 2.0  # 确保在其它元素上层
+#         # ax.set_ylabel('Cumulative Return', rotation=90)
+#         #
+#         # # 同步主图时间轴
+#             ax.sharex(self.pinf.sharex)
+#         #
+#         # # 转换时间戳
+#         # dates = [date2num(d) for d in cagr_analyzer.dates]
+#         #
+#             # # 绘制累计收益曲线
+#             main_line, = ax.plot(dates, cagr_analyzer.cum_returns,
+#                                  color='#2ca02c',  # 使用醒目颜色
+#                                  linewidth=2,
+#                                  label='Cumulative Return')
+#         #
+#         #     # # 添加最终数值标签
+#         #     # if len(cagr_analyzer.cum_returns) > 0:
+#         #     #     last_val = cagr_analyzer.cum_returns[-1]
+#         #     #     self.drawtag(ax, len(dates), last_val,
+#         #     #                  facecolor='#d62728',  # 红色背景
+#         #     #                  edgecolor='black',
+#         #     #                  alpha=0.9)
+#         #     #
+#         # # 强制刷新布局
+#         # figs.subplots_adjust(
+#         #     hspace=0.3,  # 增加行间距
+#         #     top=0.95 - (0.05 * self.pinf.sch.rowsminor)  # 动态调整顶部间距
+#         # )
+#
+#         return figs
 plot=Plot_OldSync
+# plot=CustomPlot

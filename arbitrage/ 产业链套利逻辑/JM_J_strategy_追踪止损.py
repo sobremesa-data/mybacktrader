@@ -140,7 +140,7 @@ cerebro.adddata(data2, name='spread')
 cerebro.addstrategy(SpreadBollingerStrategy)
 ##########################################################################################
 # 设置初始资金
-cerebro.broker.setcash(70000)
+cerebro.broker.setcash(700000)
 cerebro.broker.set_shortcash(False)
 cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
 cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等

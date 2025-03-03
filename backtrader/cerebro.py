@@ -984,6 +984,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
             # else:
             #     plotter = plot.Plot(**kwargs)
             plotter = plot.Plot_OldSync(**kwargs)
+            # plotter = plot.CustomPlot(**kwargs)
 
         # pfillers = {self.datas[i]: self._plotfillers[i]
         # for i, x in enumerate(self._plotfillers)}

@@ -52,3 +52,91 @@ def calculate_spread(df1, df2, factor1=5,factor2=1, columns=['open', 'high', 'lo
             df_spread[f'{col}'] = factor1 * df1_aligned[col] - factor2*df2_aligned[col]
 
     return df_spread.reset_index()
+
+
+def calculate_regression_ratio(price_a, price_b, ma, mb):
+    """
+    回归匹配持仓比例（整数版）
+    :param price_a: 品种A价格序列（pd.Series）
+    :param price_b: 品种B价格序列（pd.Series）
+    :param ma: 品种A合约乘数
+    :param mb: 品种B合约乘数
+    :return: 整数配比 (Na, Nb)
+    """
+    # 对齐数据
+    merged = pd.concat([price_a, price_b], axis=1).dropna()
+
+    # 线性回归获取μ系数（自变量price_a，因变量price_b）
+    beta = np.polyfit(merged.iloc[:, 0], merged.iloc[:, 1], 1)[0]
+
+    # 获取最新价格
+    pa = merged.iloc[-1, 0]
+    pb = merged.iloc[-1, 1]
+
+    # 计算理论配比
+    ratio = beta * (ma * pa) / (mb * pb)
+
+    # 返回最简整数比
+    return simplify_ratio(ratio)
+
+
+def calculate_volatility_ratio(price_c, price_d, mc, md):
+    """
+    波动率匹配持仓比例（整数版）
+    :param price_c: 品种C价格序列（pd.Series）
+    :param price_d: 品种D价格序列（pd.Series）
+    :param mc: 品种C合约乘数
+    :param md: 品种D合约乘数
+    :return: 整数配比 (Nc, Nd)
+    """
+    # 对齐数据
+    merged = pd.concat([price_c, price_d], axis=1).dropna()
+
+    # 计算年化波动率（假设日频数据）
+    vol_c = np.log(merged.iloc[:, 0] / merged.iloc[:, 0].shift(1)).std() * np.sqrt(252)
+    vol_d = np.log(merged.iloc[:, 1] / merged.iloc[:, 1].shift(1)).std() * np.sqrt(252)
+
+    # 获取最新价格
+    pc = merged.iloc[-1, 0]
+    pd = merged.iloc[-1, 1]
+
+    # 计算理论配比
+    ratio = (vol_c * mc * pc) / (vol_d * md * pd)
+
+    # 返回最简整数比
+    return simplify_ratio(ratio)
+
+
+def calculate_contract_value_ratio(price_e, price_f, me, mf):
+    """
+    合约价值匹配持仓比例（整数版）
+    :param price_e: 品种E价格序列（pd.Series）
+    :param price_f: 品种F价格序列（pd.Series）
+    :param me: 品种E合约乘数
+    :param mf: 品种F合约乘数
+    :return: 整数配比 (Ne, Nf)
+    """
+    # 对齐数据
+    merged = pd.concat([price_e, price_f], axis=1).dropna()
+
+    # 获取最新价格
+    pe = merged.iloc[-1, 0]
+    pf = merged.iloc[-1, 1]
+
+    # 计算理论配比
+    ratio = (me * pe) / (mf * pf)
+
+    # 返回最简整数比
+    return simplify_ratio(ratio)
+
+
+def simplify_ratio(ratio, max_denominator=100):
+    """
+    将浮点比例转换为最简整数比
+    :param ratio: 浮点比例值
+    :param max_denominator: 最大允许的分母值
+    :return: (分子, 分母) 的元组
+    """
+    from fractions import Fraction
+    frac = Fraction(ratio).limit_denominator(max_denominator)
+    return (frac.numerator, frac.denominator)

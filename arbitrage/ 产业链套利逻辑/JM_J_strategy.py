@@ -105,7 +105,7 @@ df1 = pd.read_hdf(output_file, key='/JM').reset_index()
 df_spread = calculate_spread(df0, df1, 1, 1.4)
 print(df0.head())
 
-fromdate = datetime.datetime(2024, 1, 1)
+fromdate = datetime.datetime(2020, 1, 1)
 todate = datetime.datetime(2025, 1, 1)
 
 # 添加数据
@@ -114,16 +114,29 @@ data1 = bt.feeds.PandasData(dataname=df1, datetime='date', nocase=True, fromdate
 data2 = bt.feeds.PandasData(dataname=df_spread, datetime='date', nocase=True, fromdate=fromdate, todate=todate)
 
 # 创建回测引擎
-cerebro = bt.Cerebro(stdstats=True)
+cerebro = bt.Cerebro(stdstats=False)
 cerebro.adddata(data0, name='data0')
 cerebro.adddata(data1, name='data1')
 cerebro.adddata(data2, name='spread')
 
+# cerebro.broker.setcommission(
+#     commission=0.001,  # 0.1% 费率
+#     margin=False,       # 非保证金交易
+#     mult=1,            # 价格乘数
+# )
+# # 百分比滑点
+cerebro.broker.set_slippage_perc(
+    perc=0.0005,        # 0.5% 滑点
+    slip_open=True,    # 影响开盘价
+    slip_limit=True,   # 影响限价单
+    slip_match=True,   # 调整成交价
+    slip_out=True      # 允许滑出价格范围
+)
 # 添加策略
 cerebro.addstrategy(SpreadBollingerStrategy)
 ##########################################################################################
 # 设置初始资金
-cerebro.broker.setcash(70000)
+cerebro.broker.setcash(80000)
 cerebro.broker.set_shortcash(False)
 cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
 cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
@@ -134,12 +147,16 @@ cerebro.addanalyzer(bt.analyzers.SharpeRatio,
                     )
 cerebro.addanalyzer(bt.analyzers.Returns,
                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
-                    )  # 自定义名称
-cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
+                    )
+cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days, plot=True)  # 这里的period可以是daily, weekly, monthly等
 
-cerebro.addobserver(bt.observers.Value)
-cerebro.addobserver(bt.observers.Trades)
+cerebro.addobserver(bt.observers.CashValue)
+# cerebro.addobserver(bt.observers.Cash)
+
+# cerebro.addobserver(bt.observers.Trades)
 cerebro.addobserver(bt.observers.BuySell)
+cerebro.addobserver(bt.observers.CumValue)
+
 # 运行回测
 results = cerebro.run()
 #
@@ -151,14 +168,15 @@ roi = results[0].analyzers.roianalyzer.get_analysis()
 total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
 cagr = results[0].analyzers.cagranalyzer.get_analysis()
 
+
 # # 打印分析结果
 print("=============回测结果================")
 print(f"\nSharpe Ratio: {sharpe['sharperatio']:.2f}")
 print(f"Drawdown: {drawdown['max']['drawdown']:.2f} %")
 print(f"Annualized/Normalized return: {total_returns['rnorm100']:.2f}%")  #
 print(f"Total compound return: {roi['roi100']:.2f}%")
-# print(f"年化收益: {cagr['cagr100']:.2f} %")
-# print(f"夏普比率: {cagr['sharpe']:.2f}")
+print(f"年化收益: {cagr['cagr']:.2f} ")
+print(f"夏普比率: {cagr['sharpe']:.2f}")
 
 # 绘制结果
 cerebro.plot(volume=False, spread=True)

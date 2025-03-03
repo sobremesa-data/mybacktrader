@@ -38,7 +38,49 @@ class Cash(Observer):
     def next(self):
         self.lines[0][0] = self._owner.broker.getcash()
 
+class MktValue(Observer):
+    '''This observer keeps track of the current amount of cash in the broker
 
+    Params: None
+    '''
+    _stclock = True
+
+    lines = ('mktvalue',)
+
+    plotinfo = dict(plot=True, subplot=True)
+
+    def next(self):
+        self.lines[0][0] = self._owner.broker._valuemkt
+
+class CumValue(Observer):
+    '''This observer keeps track of the current amount of cash in the broker
+
+    Params: None
+    '''
+    _stclock = True
+
+    lines = ('cumvalue',)
+
+    plotinfo = dict(plot=True, subplot=True)
+    def start(self):
+        self._value_start = self._owner.broker._valuemkt
+
+        # 初始化累计收益率的初始值
+        self._cum_return = 1.0  # 用1.0来初始化，以便于累乘
+
+    def next(self):
+        current_value = self._owner.broker._valuemkt
+
+
+        daily_return =0 if self._value_start == 0 else (current_value / self._value_start) - 1
+        daily_return = 0 if daily_return == -1 else daily_return
+
+
+        # 累乘每日收益率
+        self._cum_return *= (1 + daily_return)
+        self.lines[0][0] = self._cum_return
+
+        self._value_start = self._owner.broker._valuemkt
 class Value(Observer):
     '''This observer keeps track of the current portfolio value in the broker
     including the cash
