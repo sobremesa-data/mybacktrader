@@ -139,7 +139,7 @@ cerebro.addstrategy(SpreadBollingerStrategy)
 cerebro.broker.setcash(80000)
 cerebro.broker.set_shortcash(False)
 cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
-cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
+cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)
 cerebro.addanalyzer(bt.analyzers.SharpeRatio,
                     timeframe=bt.TimeFrame.Days,  # 按日数据计算
                     riskfreerate=0,            # 默认年化1%的风险无风险利率
@@ -148,20 +148,19 @@ cerebro.addanalyzer(bt.analyzers.SharpeRatio,
 cerebro.addanalyzer(bt.analyzers.Returns,
                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
                     )
-cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days, plot=True)  # 这里的period可以是daily, weekly, monthly等
+cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
 
-cerebro.addobserver(bt.observers.CashValue)
-# cerebro.addobserver(bt.observers.Cash)
+# cerebro.addobserver(bt.observers.CashValue)
+# cerebro.addobserver(bt.observers.Value)
 
-# cerebro.addobserver(bt.observers.Trades)
-cerebro.addobserver(bt.observers.BuySell)
+cerebro.addobserver(bt.observers.Trades)
+# cerebro.addobserver(bt.observers.BuySell)
 cerebro.addobserver(bt.observers.CumValue)
 
 # 运行回测
 results = cerebro.run()
 #
-# # 获取分析结果
-
+# 获取分析结果
 drawdown = results[0].analyzers.drawdown.get_analysis()
 sharpe = results[0].analyzers.sharperatio.get_analysis()
 roi = results[0].analyzers.roianalyzer.get_analysis()

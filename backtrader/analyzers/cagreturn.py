@@ -80,6 +80,7 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
 
         # current_value = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
         current_value = self.strategy.broker._valuemkt
+        self.strategy.broker.getvalue()
 
         #分子分母为0
         daily_return =0 if self._value_start == 0 else  (current_value / self._value_start) - 1

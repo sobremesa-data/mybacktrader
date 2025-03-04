@@ -12,8 +12,8 @@ class SpreadBollingerStrategy(bt.Strategy):
     params = (
         ('period', 15),  # 布林带周期
         ('devfactor', 1.5),  # 布林带标准差倍数
-        ('size0', 10),  # 铁矿石交易规模
-        ('size1', 14),  # 螺纹钢交易规模
+        ('size0', 2),  # 铁矿石交易规模
+        ('size1', 1),  # 螺纹钢交易规模
     )
 
     def __init__(self):
@@ -46,24 +46,7 @@ class SpreadBollingerStrategy(bt.Strategy):
         lower = self.boll.lines.bot[0]
         pos = self.getposition(self.data0).size
 
-        ##收益追踪止盈 计算当前浮动盈亏（百分比形式）
-        if pos < 0:
-            current_profit = (spread - self.entry_price) / self.entry_price
 
-            # 动态更新最大盈利
-            if current_profit > self.max_profit:
-                self.max_profit = current_profit
-
-            # 触发追踪止损条件（1%回落）
-            if self.max_profit - current_profit >= 0.01:  # 1%回撤
-                print(f"触发追踪止损 | 最高盈利:{self.max_profit:.2%} 当前盈利:{current_profit:.2%}")
-                self.close(data=self.data0)
-                self.close(data=self.data1)
-
-                # 重置状态
-                self.max_profit = 0
-                self.entry_price = 0
-                self.position_size = 0
         # 交易逻辑
         if pos == 0:
             # 开仓条件
@@ -115,16 +98,16 @@ class SpreadBollingerStrategy(bt.Strategy):
 
 # 读取数据
 output_file = 'D:\\FutureData\\ricequant\\1d_2017to2024_noadjust.h5'
-df0 = pd.read_hdf(output_file, key='/J').reset_index()
-df1 = pd.read_hdf(output_file, key='/JM').reset_index()
+df0 = pd.read_hdf(output_file, key='/C').reset_index()
+df1 = pd.read_hdf(output_file, key='/M').reset_index()
+df2 = pd.read_hdf(output_file, key='/JD').reset_index()
+
 
 ## 炼焦利润=焦炭coal期货价格-1.4*焦煤期货价格-其他成本
-df_spread = calculate_spread(df0, df1, 1, 1.4)
+df_spread = calculate_spread(df0, df1, 2, 1)
 print(df0.head())
 
-
-
-fromdate = datetime.datetime(2020, 1, 1)
+fromdate = datetime.datetime(2024, 1, 1)
 todate = datetime.datetime(2025, 1, 1)
 
 # 添加数据
@@ -136,21 +119,22 @@ data2 = bt.feeds.PandasData(dataname=df_spread, datetime='date', nocase=True, fr
 cerebro = bt.Cerebro(stdstats=False)
 cerebro.adddata(data0, name='data0')
 cerebro.adddata(data1, name='data1')
-cerebro.adddata(data2, name='spread')
+cerebro.adddata(data2, name='data2')
+cerebro.adddata(data3, name='spread')
 
 # cerebro.broker.setcommission(
 #     commission=0.001,  # 0.1% 费率
 #     margin=False,       # 非保证金交易
 #     mult=1,            # 价格乘数
 # )
-# # 百分比滑点
-cerebro.broker.set_slippage_perc(
-    perc=0.0005,        # 0.5% 滑点
-    slip_open=True,    # 影响开盘价
-    slip_limit=True,   # 影响限价单
-    slip_match=True,   # 调整成交价
-    slip_out=True      # 允许滑出价格范围
-)
+# # # 百分比滑点
+# cerebro.broker.set_slippage_perc(
+#     perc=0.0005,        # 0.5% 滑点
+#     slip_open=True,    # 影响开盘价
+#     slip_limit=True,   # 影响限价单
+#     slip_match=True,   # 调整成交价
+#     slip_out=True      # 允许滑出价格范围
+# )
 # 添加策略
 cerebro.addstrategy(SpreadBollingerStrategy)
 ##########################################################################################
@@ -158,7 +142,7 @@ cerebro.addstrategy(SpreadBollingerStrategy)
 cerebro.broker.setcash(80000)
 cerebro.broker.set_shortcash(False)
 cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
-cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
+cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)
 cerebro.addanalyzer(bt.analyzers.SharpeRatio,
                     timeframe=bt.TimeFrame.Days,  # 按日数据计算
                     riskfreerate=0,            # 默认年化1%的风险无风险利率
@@ -169,11 +153,11 @@ cerebro.addanalyzer(bt.analyzers.Returns,
                     )
 cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
 
-cerebro.addobserver(bt.observers.CashValue)
-# cerebro.addobserver(bt.observers.Cash)
+# cerebro.addobserver(bt.observers.CashValue)
+# cerebro.addobserver(bt.observers.Value)
 
-# cerebro.addobserver(bt.observers.Trades)
-cerebro.addobserver(bt.observers.BuySell)
+cerebro.addobserver(bt.observers.Trades)
+# cerebro.addobserver(bt.observers.BuySell)
 cerebro.addobserver(bt.observers.CumValue)
 
 # 运行回测
@@ -198,3 +182,4 @@ print(f"夏普比率: {cagr['sharpe']:.2f}")
 
 # 绘制结果
 cerebro.plot(volume=False, spread=True)
+

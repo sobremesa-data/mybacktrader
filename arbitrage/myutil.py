@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import adfuller
+
+
 # 1. 首先确认两个DataFrame的index是否相同
 def check_and_align_data(df1, df2, date_column='date'):
     """
@@ -54,31 +58,6 @@ def calculate_spread(df1, df2, factor1=5,factor2=1, columns=['open', 'high', 'lo
     return df_spread.reset_index()
 
 
-def calculate_regression_ratio(price_a, price_b, ma, mb):
-    """
-    回归匹配持仓比例（整数版）
-    :param price_a: 品种A价格序列（pd.Series）
-    :param price_b: 品种B价格序列（pd.Series）
-    :param ma: 品种A合约乘数
-    :param mb: 品种B合约乘数
-    :return: 整数配比 (Na, Nb)
-    """
-    # 对齐数据
-    merged = pd.concat([price_a, price_b], axis=1).dropna()
-
-    # 线性回归获取μ系数（自变量price_a，因变量price_b）
-    beta = np.polyfit(merged.iloc[:, 0], merged.iloc[:, 1], 1)[0]
-
-    # 获取最新价格
-    pa = merged.iloc[-1, 0]
-    pb = merged.iloc[-1, 1]
-
-    # 计算理论配比
-    ratio = beta * (ma * pa) / (mb * pb)
-
-    # 返回最简整数比
-    return simplify_ratio(ratio)
-
 
 def calculate_volatility_ratio(price_c, price_d, mc, md):
     """
@@ -107,30 +86,7 @@ def calculate_volatility_ratio(price_c, price_d, mc, md):
     return simplify_ratio(ratio)
 
 
-def calculate_contract_value_ratio(price_e, price_f, me, mf):
-    """
-    合约价值匹配持仓比例（整数版）
-    :param price_e: 品种E价格序列（pd.Series）
-    :param price_f: 品种F价格序列（pd.Series）
-    :param me: 品种E合约乘数
-    :param mf: 品种F合约乘数
-    :return: 整数配比 (Ne, Nf)
-    """
-    # 对齐数据
-    merged = pd.concat([price_e, price_f], axis=1).dropna()
-
-    # 获取最新价格
-    pe = merged.iloc[-1, 0]
-    pf = merged.iloc[-1, 1]
-
-    # 计算理论配比
-    ratio = (me * pe) / (mf * pf)
-
-    # 返回最简整数比
-    return simplify_ratio(ratio)
-
-
-def simplify_ratio(ratio, max_denominator=100):
+def simplify_ratio(ratio, max_denominator=10):
     """
     将浮点比例转换为最简整数比
     :param ratio: 浮点比例值
@@ -140,3 +96,46 @@ def simplify_ratio(ratio, max_denominator=100):
     from fractions import Fraction
     frac = Fraction(ratio).limit_denominator(max_denominator)
     return (frac.numerator, frac.denominator)
+
+class KalmanFilter:
+    def __init__(self):
+        self.x = np.array([1.0])  # 初始系数（假设1:1配比）
+        self.P = np.eye(1)        # 状态协方差
+        self.Q = 0.01             # 过程噪声
+        self.R = 0.1              # 观测噪声
+
+    def update(self, z):
+        # 预测步骤
+        x_pred = self.x
+        P_pred = self.P + self.Q
+
+        # 更新步骤
+        K = P_pred / (P_pred + self.R)
+        self.x = x_pred + K * (z - x_pred)
+        self.P = (1 - K) * P_pred
+        return self.x[0]
+
+def kalman_ratio(df1, df2):
+    kf = KalmanFilter()
+    spreads = []
+    for p1, p2 in zip(df1, df2):
+        if p2 != 0:
+            ratio = p1 / p2  # 实时价格比
+            beta = kf.update(ratio)
+        spreads.append(p1 - beta * p2)
+
+    # 取末段均值确定整数配比
+    final_beta = np.mean(kf.x[-30:]) if len(df1) >30 else round(kf.x[-1])
+    return simplify_ratio(final_beta), np.array(spreads)
+
+
+def cointegration_ratio(df1, df2):
+
+    # 协整回归
+    X = sm.add_constant(df2)
+    model = sm.OLS(df1, X).fit()
+    beta = model.params[1] # 回归系数整数化
+    spread = df1 - beta * df2  # 价差序列
+
+    return simplify_ratio(beta), spread  # 配比格式(资产1单位:资产β单位)
+
