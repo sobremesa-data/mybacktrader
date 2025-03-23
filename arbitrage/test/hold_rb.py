@@ -102,7 +102,7 @@ results = cerebro.run()
 # 获取分析结果
 sharpe = results[0].analyzers.sharperatio.get_analysis()
 drawdown = results[0].analyzers.drawdown.get_analysis()
-annual_returns = results[0].analyzers.annualreturn.get_analysis()
+# annual_returns = results[0].analyzers.annualreturn.get_analysis()
 # total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
 cagr = results[0].analyzers.cagranalyzer.get_analysis()
 trade = results[0].analyzers.tradeanalyzer.get_analysis()
@@ -112,7 +112,7 @@ print("=============回测结果================")
 print(f"\n夏普比率: {sharpe['sharperatio']:.2f}")
 print(f"最大回撤: {drawdown['max']['drawdown']:.2f} %")
 # print(f"总回报率: {total_returns['rnorm100']:.2f}%")  # 打印总回报率
-print(f"年化收益: {cagr['cagr100']:.2f} %")
+print(f"年化收益: {cagr['cagr']:.2f} %")
 print(f"sharpe: {cagr['sharpe']:.2f} ")
 
 print(f"交易记录: {trade}")
@@ -125,4 +125,4 @@ print(f"交易记录: {trade}")
 #     print("{:<8} {:<12.2%}".format(year, return_rate))
 
 # 绘制结果
-# cerebro.plot(volume=False)
+cerebro.plot(volume=False)

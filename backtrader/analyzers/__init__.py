@@ -41,5 +41,5 @@ from .logreturnsrolling import *
 
 from .calmar import *
 from .periodstats import *
-from .cagreturn import *
+from .caganalyzer import *
 from .roi import *

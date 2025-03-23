@@ -52,8 +52,9 @@ class MktValue(Observer):
     def next(self):
         self.lines[0][0] = self._owner.broker._valuemkt
 
+
 class CumValue(Observer):
-    '''This observer keeps track of the current amount of cash in the broker
+    '''This observer keeps track of the cumulative compounded returns
 
     Params: None
     '''
@@ -62,25 +63,25 @@ class CumValue(Observer):
     lines = ('cumvalue',)
 
     plotinfo = dict(plot=True, subplot=True)
-    def start(self):
-        self._value_start = self._owner.broker._valuemkt
 
-        # 初始化累计收益率的初始值
-        self._cum_return = 1.0  # 用1.0来初始化，以便于累乘
+    def start(self):
+        self._initial_value = self._owner.broker.getvalue()
+        self._cum_return = 1.0
+        self._prev_value = self._initial_value  # Track previous day's value
 
     def next(self):
-        current_value = self._owner.broker._valuemkt
+        current_value = self._owner.broker.getvalue()
 
-
-        daily_return =0 if self._value_start == 0 else (current_value / self._value_start) - 1
+        # Calculate day-to-day return
+        daily_return = 0 if self._prev_value == 0 else (current_value / self._prev_value) - 1
         daily_return = 0 if daily_return == -1 else daily_return
 
-
-        # 累乘每日收益率
+        # Multiply by (1 + daily_return) to get compound effect
         self._cum_return *= (1 + daily_return)
         self.lines[0][0] = self._cum_return
 
-        self._value_start = self._owner.broker._valuemkt
+        # Update previous value for next calculation
+        self._prev_value = current_value
 class Value(Observer):
     '''This observer keeps track of the current portfolio value in the broker
     including the cash

@@ -105,7 +105,7 @@ df1 = pd.read_hdf(output_file, key='/JM').reset_index()
 df_spread = calculate_spread(df0, df1, 1, 1.4)
 print(df0.head())
 
-fromdate = datetime.datetime(2020, 1, 1)
+fromdate = datetime.datetime(2020, 11, 1)
 todate = datetime.datetime(2025, 1, 1)
 
 # 添加数据
@@ -125,13 +125,13 @@ cerebro.adddata(data2, name='spread')
 #     mult=1,            # 价格乘数
 # )
 # # 百分比滑点
-cerebro.broker.set_slippage_perc(
-    perc=0.0005,        # 0.5% 滑点
-    slip_open=True,    # 影响开盘价
-    slip_limit=True,   # 影响限价单
-    slip_match=True,   # 调整成交价
-    slip_out=True      # 允许滑出价格范围
-)
+# cerebro.broker.set_slippage_perc(
+#     perc=0.0005,        # 0.5% 滑点
+#     slip_open=True,    # 影响开盘价
+#     slip_limit=True,   # 影响限价单
+#     slip_match=True,   # 调整成交价
+#     slip_out=True      # 允许滑出价格范围
+# )
 # 添加策略
 cerebro.addstrategy(SpreadBollingerStrategy)
 ##########################################################################################
@@ -148,7 +148,7 @@ cerebro.addanalyzer(bt.analyzers.SharpeRatio,
 cerebro.addanalyzer(bt.analyzers.Returns,
                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
                     )
-cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
+cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days,plot=True)  # 这里的period可以是daily, weekly, monthly等
 
 # cerebro.addobserver(bt.observers.CashValue)
 # cerebro.addobserver(bt.observers.Value)
@@ -178,5 +178,5 @@ print(f"年化收益: {cagr['cagr']:.2f} ")
 print(f"夏普比率: {cagr['sharpe']:.2f}")
 
 # 绘制结果
-cerebro.plot(volume=False, spread=True)
+# cerebro.plot(volume=False, spread=True)
 

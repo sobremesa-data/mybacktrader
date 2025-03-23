@@ -70,6 +70,10 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
         # 存储结果
         self.rets['cagr'] = cagr
         self.rets['sharpe'] = sharpe
+        
+        # 如果plot参数为True，则绘制累积收益率图表
+        if self.p.plot and len(self.dates) > 0:
+            self.plot_cumulative_returns()
 
     def next(self):
         '''Calculate returns on each time step'''
@@ -90,12 +94,27 @@ class CAGRAnalyzer(TimeFrameAnalyzerBase):
 
         # 累乘每日收益率
         self._cum_return *= (1 + daily_return)
+        
+        # 记录日期和累积收益率
+        self.dates.append(self.strategy.datetime.date())
+        self.cum_returns.append(self._cum_return)
+        
         # print(self._cum_return,daily_return,self.strategy.broker._valuemkt,self.strategy.broker.getvalue(),self.strategy.broker.getcash())
 
 
         # 更新初始值（当新的时间段（天、周、月等）开始时，使用当前值作为新的初始值）
         # self._value_start = self.strategy.broker.getvalue() if not self._fundmode else self.strategy.broker.fundvalue
         self._value_start = self.strategy.broker._valuemkt
+
+    def plot_cumulative_returns(self):
+        '''绘制累积收益率图表'''
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.dates, self.cum_returns, 'b-', linewidth=2)
+        plt.title('cumulative returns')
+        plt.xlabel('date')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
     def get_analysis(self):
         '''Returns the CAGR value'''
