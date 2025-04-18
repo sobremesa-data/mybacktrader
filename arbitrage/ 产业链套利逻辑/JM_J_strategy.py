@@ -105,7 +105,7 @@ df1 = pd.read_hdf(output_file, key='/JM').reset_index()
 df_spread = calculate_spread(df0, df1, 1, 1.4)
 print(df0.head())
 
-fromdate = datetime.datetime(2020, 11, 1)
+fromdate = datetime.datetime(2018, 1, 1)
 todate = datetime.datetime(2025, 1, 1)
 
 # 添加数据

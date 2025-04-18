@@ -281,7 +281,7 @@ def run_grid_search():
                      yticklabels=ma_periods)
     
     # 设置标题和标签
-    plt.title('夏普比率热力图 - ma_period vs entry_std_multiplier')
+    plt.title('sharpe_ratio_heatmap - ma_period vs entry_std_multiplier')
     plt.xlabel('entry_std_multiplier')
     plt.ylabel('ma_period')
     

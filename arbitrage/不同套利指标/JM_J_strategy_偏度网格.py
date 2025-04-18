@@ -327,7 +327,7 @@ def run_grid_search():
                      yticklabels=skew_periods)
     
     # 设置标题和标签
-    plt.title('夏普比率热力图 - skew_period vs entry_std_multiplier')
+    plt.title('sharperatio - skew_period vs entry_std_multiplier')
     plt.xlabel('entry_std_multiplier')
     plt.ylabel('skew_period')
     
@@ -347,7 +347,7 @@ def run_grid_search():
     print(f"\n最佳参数组合:")
     print(f"skew_period: {best_skew_period}")
     print(f"entry_std_multiplier: {best_entry_multiplier}")
-    print(f"夏普比率: {best_sharpe:.4f}")
+    print(f"sharperatio: {best_sharpe:.4f}")
     
     return results, skew_periods, entry_multipliers
 
