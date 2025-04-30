@@ -307,3 +307,17 @@ def grid_search():
 
 if __name__ == '__main__':
     grid_search() 
+
+
+
+#     ========= 所有参数组合结果（按夏普比率排序）=========
+# 1. spread_window=20, win=15, k_coeff=0.80, h_coeff=10.00, sharpe=0.6383, drawdown=2.92%, return=1.96%, win_rate=52.62%
+# 2. spread_window=30, win=20, k_coeff=0.40, h_coeff=8.00, sharpe=0.6269, drawdown=3.59%, return=1.89%, win_rate=51.85%
+# 3. spread_window=20, win=15, k_coeff=0.40, h_coeff=3.00, sharpe=0.6034, drawdown=4.57%, return=2.32%, win_rate=52.28%
+# 4. spread_window=30, win=30, k_coeff=0.20, h_coeff=3.00, sharpe=0.6008, drawdown=4.10%, return=2.68%, win_rate=53.28%
+# 5. spread_window=30, win=15, k_coeff=0.80, h_coeff=5.00, sharpe=0.5849, drawdown=4.23%, return=2.33%, win_rate=52.16%
+# 6. spread_window=20, win=15, k_coeff=0.20, h_coeff=3.00, sharpe=0.5742, drawdown=7.13%, return=2.57%, win_rate=53.00%
+# 7. spread_window=30, win=20, k_coeff=0.50, h_coeff=3.00, sharpe=0.5645, drawdown=8.03%, return=2.67%, win_rate=51.85%
+# 8. spread_window=30, win=30, k_coeff=0.50, h_coeff=10.00, sharpe=0.5269, drawdown=5.43%, return=1.68%, win_rate=53.44%
+# 9. spread_window=20, win=30, k_coeff=0.40, h_coeff=3.00, sharpe=0.5239, drawdown=4.78%, return=2.21%, win_rate=52.86%
+# 10. spread_window=30, win=20, k_coeff=0.50, h_coeff=8.00, sharpe=0.5158, drawdown=4.70%, return=1.95%, win_rate=54.31%
