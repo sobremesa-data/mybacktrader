@@ -101,7 +101,7 @@ class DynamicSpreadCUSUMStrategy(bt.Strategy):
             return
 
         # 2) 取"上一 bar"结束时的 rolling σ，避免未来函数
-        hist = self.spread_series.get(size=self.p.win + 1)[:-1]  # 不含当根
+        hist = self.spread_series.get(size=self.p.win + 1)  # 不含当根
         sigma = np.std(hist, ddof=1)
         if np.isnan(sigma) or sigma == 0:
             return
@@ -132,11 +132,14 @@ class DynamicSpreadCUSUMStrategy(bt.Strategy):
                 self._open_position(short=False)
                 self.g_pos = self.g_neg = 0
         else:
-            # 5) 平仓逻辑——价差回到 0 附近
-            if position_size > 0 and abs(s_t) < kappa:
-                self._close_positions()
-            elif position_size < 0 and abs(s_t) < kappa:
-                self._close_positions()
+            # 5) 优化平仓逻辑：动态退出阈值
+            exit_threshold = max(kappa, 0.25*sigma)  # 取较大值避免频繁平仓
+            if position_size > 0:
+                if s_t < -exit_threshold:  # 多头平仓条件加强
+                    self._close_positions()
+            elif position_size < 0:
+                if s_t > exit_threshold:   # 空头平仓条件加强
+                    self._close_positions()
 
     def notify_trade(self, trade):
         if not self.p.verbose:

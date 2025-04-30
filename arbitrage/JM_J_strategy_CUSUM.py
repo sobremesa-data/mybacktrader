@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('--window', type=int, default=30, help='计算滚动价差的窗口大小')
     parser.add_argument('--df0_key', type=str, default='/J', help='第一个数据集的键值')
     parser.add_argument('--df1_key', type=str, default='/JM', help='第二个数据集的键值')
-    parser.add_argument('--fromdate', type=str, default='2017-01-01', help='回测开始日期')
+    parser.add_argument('--fromdate', type=str, default='2018-01-01', help='回测开始日期')
     parser.add_argument('--todate', type=str, default='2025-01-01', help='回测结束日期')
     parser.add_argument('--win', type=int, default=30, help='策略中的滚动窗口')
     parser.add_argument('--k_coeff', type=float, default=0.6, help='kappa系数')
@@ -183,11 +183,14 @@ class DynamicSpreadCUSUMStrategy(bt.Strategy):
                 self._open_position(short=False)
                 self.g_pos = self.g_neg = 0
         else:
-            # 5) 平仓逻辑——价差回到 0 附近
-            if position_size > 0 and abs(s_t) < kappa:
-                self._close_positions()
-            elif position_size < 0 and abs(s_t) < kappa:
-                self._close_positions()
+            # 5) 优化平仓逻辑：动态退出阈值
+            exit_threshold = max(kappa, 0.25*sigma)  # 取较大值避免频繁平仓
+            if position_size > 0:
+                if s_t < -exit_threshold:  # 多头平仓条件加强
+                    self._close_positions()
+            elif position_size < 0:
+                if s_t > exit_threshold:   # 空头平仓条件加强
+                    self._close_positions()
 
     def notify_trade(self, trade):
         if trade.isclosed:
