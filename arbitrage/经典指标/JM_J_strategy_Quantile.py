@@ -9,36 +9,49 @@ from arbitrage.myutil import calculate_spread, check_and_align_data, cointegrati
 # https://mp.weixin.qq.com/s/na-5duJiRM1fTJF0WrcptA
 
 
-def calculate_rolling_spread(df0, df1, window: int = 90):
-    """滚动计算 β 和价差（spread）"""
-    # 1. 对齐并合并价格
-    df = (df0.set_index('date')['close']
-               .rename('close0')
-               .to_frame()
-               .join(df1.set_index('date')['close']
-                         .rename('close1'),
-                     how='inner'))
+def calculate_rolling_spread(
+        df0: pd.DataFrame,          # 必含 'date' 与价格列
+        df1: pd.DataFrame,
+        window: int = 90,
+        fields=('open', 'high', 'low', 'close')
+    ) -> pd.DataFrame:
+    """
+    计算滚动 β，并为指定价格字段生成价差 (spread)：
+        spread_x = price0_x - β_{t-1} * price1_x
+    """
+    # 1) 用收盘价对齐合并（β 仍用 close 估计）
+    df = (df0.set_index('date')[['close']]
+              .rename(columns={'close': 'close0'})
+              .join(df1.set_index('date')[['close']]
+                        .rename(columns={'close': 'close1'}),
+                    how='inner'))
 
-    # 2. 计算滚动 β（向量化做法，比 rolling-apply 快很多）
-    cov  = df['close0'].rolling(window).cov(df['close1'])
-    var1 = df['close1'].rolling(window).var()
-    beta = (cov / var1).round(1)
+    # 2) 估计 β_t ，再向前挪一天
+    beta_raw   = df['close0'].rolling(window).cov(df['close1']) / \
+                 df['close1'].rolling(window).var()
+    beta_shift = beta_raw.shift(1).round(1)        # 防未来 + 保留 1 位小数
 
-    # 3. 计算价差
-    spread = df['close0'] - beta * df['close1']
+    # 3) 把 β 拼回主表（便于后面 vectorized 计算）
+    df = df.assign(beta=beta_shift)
 
-    # 4. 整理输出
-    out = (pd.DataFrame({'date': df.index,
-                         'beta': beta,
-                         'close': spread})
+    # 4) 对每个字段算 spread
+    out_cols = {'date': df.index, 'beta': beta_shift}
+    for f in fields:
+        if f not in ('open','high','low','close'):
+            raise ValueError(f'未知字段 {f}')
+        p0 = df0.set_index('date')[f]
+        p1 = df1.set_index('date')[f]
+        aligned = p0.to_frame(name=f'price0_{f}').join(
+                  p1.to_frame(name=f'price1_{f}'), how='inner')
+        spread_f = aligned[f'price0_{f}'] - beta_shift * aligned[f'price1_{f}']
+        out_cols[f'{f}'] = spread_f
+
+    # 5) 整理输出
+    out = (pd.DataFrame(out_cols)
              .dropna()
              .reset_index(drop=True))
-    
-    # 5. 确保日期列是正确的日期类型
     out['date'] = pd.to_datetime(out['date'])
-    
     return out
-
 # 读取数据
 output_file = 'D:\\FutureData\\ricequant\\1d_2017to2024_noadjust.h5'
 df0 = pd.read_hdf(output_file, key='/J').reset_index()
@@ -49,7 +62,7 @@ df0['date'] = pd.to_datetime(df0['date'])
 df1['date'] = pd.to_datetime(df1['date'])
 
 # 计算滚动价差
-df_spread = calculate_rolling_spread(df0, df1, window=60)
+df_spread = calculate_rolling_spread(df0, df1, window=90)
 print("滚动价差计算完成，系数示例：")
 print(df_spread.head())
 
@@ -72,19 +85,50 @@ data0 = bt.feeds.PandasData(dataname=df0, datetime='date', nocase=True, fromdate
 data1 = bt.feeds.PandasData(dataname=df1, datetime='date', nocase=True, fromdate=fromdate, todate=todate)
 data2 = SpreadData(dataname=df_spread, fromdate=fromdate, todate=todate)
 
-class DynamicSpreadStrategy(bt.Strategy):
+# 创建分位数指标（自定义）
+class QuantileIndicator(bt.Indicator):
+    lines = ('upper', 'lower', 'mid')
     params = (
         ('period', 30),
-        ('devfactor', 2),
+        ('upper_quantile', 0.85),  # 上轨分位数
+        ('lower_quantile', 0.15),  # 下轨分位数
     )
 
     def __init__(self):
-        # 布林带指标 - 使用传入的价差数据
-        self.boll = bt.indicators.BollingerBands(
-            self.data2.close,
-            period=self.p.period,
-            devfactor=self.p.devfactor,
-            subplot=False
+        self.addminperiod(self.p.period)
+        self.spread_data = []
+
+    def next(self):
+        self.spread_data.append(self.data[0])
+        if len(self.spread_data) > self.p.period:
+            self.spread_data.pop(0)  # 保持固定长度
+
+        if len(self.spread_data) >= self.p.period:
+            spread_array = np.array(self.spread_data)
+            self.lines.upper[0] = np.quantile(spread_array, self.p.upper_quantile)
+            self.lines.lower[0] = np.quantile(spread_array, self.p.lower_quantile)
+            self.lines.mid[0] = np.median(spread_array)
+        else:
+            self.lines.upper[0] = self.data[0]
+            self.lines.lower[0] = self.data[0]
+            self.lines.mid[0] = self.data[0]
+
+
+class DynamicSpreadQuantileStrategy(bt.Strategy):
+    params = (
+        ('lookback_period', 60),    # 回看周期
+        ('upper_quantile', 0.9),   # 上轨分位数（90%）
+        ('lower_quantile', 0.1),   # 下轨分位数（10%）
+    )
+
+    def __init__(self):
+        # 计算价差的分位数指标
+        self.quantile = QuantileIndicator(
+            self.data2.close, 
+            period=self.p.lookback_period,
+            upper_quantile=self.p.upper_quantile,
+            lower_quantile=self.p.lower_quantile,
+            subplot=True
         )
 
         # 交易状态
@@ -110,19 +154,25 @@ class DynamicSpreadStrategy(bt.Strategy):
         if len(self) % 20 == 0:  # 每20个bar打印一次，减少输出
             print(f'{self.datetime.date()}: beta={current_beta}, J:{self.size0}手, JM:{self.size1}手')
 
-        # 使用传入的价差数据
+        # 使用分位数指标进行交易决策
         spread = self.data2.close[0]
-        mid = self.boll.lines.mid[0]
+        upper_band = self.quantile.upper[0]
+        lower_band = self.quantile.lower[0]
+        mid_band = self.quantile.mid[0]
         pos = self.getposition(self.data0).size
 
         # 开平仓逻辑
-        if pos == 0:
-            if spread > self.boll.lines.top[0]:
+        if pos == 0:  # 没有持仓
+            if spread > upper_band:
+                # 价差高于上轨（90%分位数），做空价差（做空J，做多JM）
                 self._open_position(short=True)
-            elif spread < self.boll.lines.bot[0]:
+            elif spread < lower_band:
+                # 价差低于下轨（10%分位数），做多价差（做多J，做空JM）
                 self._open_position(short=False)
-        else:
-            if (spread <= mid and pos < 0) or (spread >= mid and pos > 0):
+        else:  # 已有持仓
+            if pos > 0 and spread >= mid_band:  # 持有多头且价差回归到中位数
+                self._close_positions()
+            elif pos < 0 and spread <= mid_band:  # 持有空头且价差回归到中位数
                 self._close_positions()
 
     def _open_position(self, short):
@@ -134,12 +184,12 @@ class DynamicSpreadStrategy(bt.Strategy):
         
         if short:
             print(f'做空J {self.size0}手, 做多JM {self.size1}手')
-            self.sell(data=self.data0, size=self.size0)
-            self.buy(data=self.data1, size=self.size1)
-        else:
-            print(f'做多J {self.size0}手, 做空JM {self.size1}手')
             self.buy(data=self.data0, size=self.size0)
             self.sell(data=self.data1, size=self.size1)
+        else:
+            print(f'做多J {self.size0}手, 做空JM {self.size1}手')
+            self.sell(data=self.data0, size=self.size0)
+            self.buy(data=self.data1, size=self.size1)
         self.entry_price = self.data2.close[0]
 
     def _close_positions(self):
@@ -154,41 +204,15 @@ class DynamicSpreadStrategy(bt.Strategy):
             print('TRADE %s OPENED %s  , SIZE %2d, PRICE %d ' % (
             trade.ref, bt.num2date(trade.dtopen), trade.size, trade.value))
 
-    # def notify_order(self, order):
-    #     if order.status in [order.Submitted, order.Accepted]:
-    #         # 订单状态 submitted/accepted，处于未决订单状态。
-    #         return
-    #
-    #     # 订单已决，执行如下语句
-    #     if order.status in [order.Completed]:
-    #         if order.isbuy():
-    #             print(f'executed date {bt.num2date(order.executed.dt)},executed price {order.executed.price}, created date {bt.num2date(order.created.dt)}')
-
-
 # 创建回测引擎
 cerebro = bt.Cerebro(stdstats=False)
 cerebro.adddata(data0, name='data0')
 cerebro.adddata(data1, name='data1')
 cerebro.adddata(data2, name='spread')
 
-# cerebro.broker.setcommission(
-#     commission=0.001,  # 0.1% 费率
-#     margin=False,       # 非保证金交易
-#     mult=1,            # 价格乘数
-# )
-# # # 百分比滑点
-# cerebro.broker.set_slippage_perc(
-#     perc=0.0005,        # 0.5% 滑点
-#     slip_open=True,    # 影响开盘价
-#     slip_limit=True,   # 影响限价单
-#     slip_match=True,   # 调整成交价
-#     slip_out=True      # 允许滑出价格范围
-# )
-
-
 # 添加策略
-cerebro.addstrategy(DynamicSpreadStrategy)
-##########################################################################################
+cerebro.addstrategy(DynamicSpreadQuantileStrategy)
+
 # 设置初始资金
 cerebro.broker.setcash(100000)
 cerebro.broker.set_shortcash(False)
@@ -202,35 +226,29 @@ cerebro.addanalyzer(bt.analyzers.SharpeRatio,
 cerebro.addanalyzer(bt.analyzers.Returns,
                     tann=bt.TimeFrame.Days,  # 年化因子，252 个交易日
                     )
-cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
+# cerebro.addanalyzer(bt.analyzers.CAGRAnalyzer, period=bt.TimeFrame.Days)  # 这里的period可以是daily, weekly, monthly等
 cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
-# cerebro.addobserver(bt.observers.CashValue)
-# cerebro.addobserver(bt.observers.Value)
-
 cerebro.addobserver(bt.observers.Trades)
-# cerebro.addobserver(bt.observers.BuySell)
 cerebro.addobserver(bt.observers.CumValue)
 
 # 运行回测
 results = cerebro.run()
-#
+
 # 获取分析结果
 drawdown = results[0].analyzers.drawdown.get_analysis()
 sharpe = results[0].analyzers.sharperatio.get_analysis()
 roi = results[0].analyzers.roianalyzer.get_analysis()
 total_returns = results[0].analyzers.returns.get_analysis()  # 获取总回报率
-cagr = results[0].analyzers.cagranalyzer.get_analysis()
-# trade_analysis = results[0].analyzers.tradeanalyzer.get_analysis()  # 通过名称获取分析结果
+# cagr = results[0].analyzers.cagranalyzer.get_analysis()
 
-# # 打印分析结果
+# 打印分析结果
 print("=============回测结果================")
 print(f"\nSharpe Ratio: {sharpe['sharperatio']:.2f}")
 print(f"Drawdown: {drawdown['max']['drawdown']:.2f} %")
 print(f"Annualized/Normalized return: {total_returns['rnorm100']:.2f}%")  #
 print(f"Total compound return: {roi['roi100']:.2f}%")
-print(f"年化收益: {cagr['cagr']:.2f} ")
-print(f"夏普比率: {cagr['sharpe']:.2f}")
+# print(f"年化收益: {cagr['cagr']:.2f} ")
+# print(f"夏普比率: {cagr['sharpe']:.2f}")
 # 绘制结果
-cerebro.plot(volume=False, spread=True)
-
+cerebro.plot(volume=False, spread=True) 

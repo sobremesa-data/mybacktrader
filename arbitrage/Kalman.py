@@ -73,7 +73,7 @@ class SpreadData(bt.feeds.PandasData):
 # Kalman Pairs Trading Strategy
 class KalmanPairTradingStrategy(bt.Strategy):
     params = (
-        ('z_entry', 2.0),     # Z-score threshold for entry
+        ('z_entry', 1),     # Z-score threshold for entry
         ('z_exit', 0.0),      # Z-score threshold for exit
         ('lookback', 15),     # Default lookback period (updated with half-life)
         ('size0', 10),         # Size for first asset
