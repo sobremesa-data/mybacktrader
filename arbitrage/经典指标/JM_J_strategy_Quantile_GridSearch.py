@@ -86,7 +86,9 @@ class DynamicSpreadQuantileStrategy(bt.Strategy):
         ('lookback_period', 60),       # 回看周期
         ('upper_quantile', 0.9),       # 上轨分位数
         ('lower_quantile', 0.1),       # 下轨分位数
-        ('verbose', False),            # 是否打印详细信息
+        ('max_positions', 3),          # 最大加仓次数
+        ('add_position_threshold', 0.1),  # 加仓阈值（相对于轨道的百分比）
+        ('verbose', True),            # 是否打印详细信息
     )
 
     def __init__(self):
@@ -97,6 +99,11 @@ class DynamicSpreadQuantileStrategy(bt.Strategy):
             upper_quantile=self.p.upper_quantile,
             lower_quantile=self.p.lower_quantile,
         )
+        # 交易状态
+        self.order = None
+        self.entry_price = 0
+        self.entry_direction = None  # 持仓方向：'long'/'short'
+        self.position_layers = 0     # 当前持仓层数
 
         # 交易状态
         self.order = None
@@ -137,6 +144,23 @@ class DynamicSpreadQuantileStrategy(bt.Strategy):
                 # 价差低于下轨，做多价差（做空J，做多JM）
                 self._open_position(short=False)
         else:  # 已有持仓
+            # 自动加仓逻辑
+            if self.position_layers < self.p.max_positions:
+                # 多头加仓条件
+                if pos > 0:
+                    # 以lower_band为基准，spread越低越加仓
+                    next_layer = self.position_layers + 1
+                    add_threshold = lower_band - next_layer * self.p.add_position_threshold * (upper_band - lower_band)
+                    if spread < add_threshold:
+                        self._add_position(short=False)
+                # 空头加仓条件
+                elif pos < 0:
+                    # 以upper_band为基准，spread越高越加仓
+                    next_layer = self.position_layers + 1
+                    add_threshold = upper_band + next_layer * self.p.add_position_threshold * (upper_band - lower_band)
+                    if spread > add_threshold:
+                        self._add_position(short=True)
+            # 平仓逻辑
             if pos > 0 and spread >= mid_band:  # 持有多头且价差回归到中位数
                 self._close_positions()
             elif pos < 0 and spread <= mid_band:  # 持有空头且价差回归到中位数
@@ -149,21 +173,57 @@ class DynamicSpreadQuantileStrategy(bt.Strategy):
             self.size0 = 10  # 默认值
             self.size1 = round(self.data2.beta[0] * 10) if not pd.isna(self.data2.beta[0]) else 14
         
+        # 检查资金是否足够
+        cash = self.broker.getcash()
+        cost = self.size0 * self.data0.close[0] + self.size1 * self.data1.close[0]
+        if cash < cost:
+            if self.p.verbose:
+                print(f'资金不足，无法开仓: 需要{cost:.2f}，可用{cash:.2f}')
+            return
+        
         if short:
             if self.p.verbose:
                 print(f'做多J {self.size0}手, 做空JM {self.size1}手')
             self.buy(data=self.data0, size=self.size0)
             self.sell(data=self.data1, size=self.size1)
+            self.entry_direction = 'short'
         else:
             if self.p.verbose:
                 print(f'做空J {self.size0}手, 做多JM {self.size1}手')
             self.sell(data=self.data0, size=self.size0)
             self.buy(data=self.data1, size=self.size1)
+            self.entry_direction = 'long'
         self.entry_price = self.data2.close[0]
+        self.position_layers = 1  # 首次开仓为第一层
+
+    def _add_position(self, short):
+        '''加仓，自动套利配比，资金检查'''
+        # 计算加仓规模（每层同等规模，也可自定义递减）
+        add_size0 = self.size0
+        add_size1 = self.size1
+        # 检查资金
+        cash = self.broker.getcash()
+        cost = add_size0 * self.data0.close[0] + add_size1 * self.data1.close[0]
+        if cash < cost:
+            if self.p.verbose:
+                print(f'资金不足，无法加仓: 需要{cost:.2f}，可用{cash:.2f}')
+            return
+        if short:
+            # if self.p.verbose:
+            print(f'加仓做多J {add_size0}手, 做空JM {add_size1}手')
+            self.buy(data=self.data0, size=add_size0)
+            self.sell(data=self.data1, size=add_size1)
+        else:
+            # if self.p.verbose:
+            print(f'加仓做空J {add_size0}手, 做多JM {add_size1}手')
+            self.sell(data=self.data0, size=add_size0)
+            self.buy(data=self.data1, size=add_size1)
+        self.position_layers += 1
 
     def _close_positions(self):
         self.close(data=self.data0)
         self.close(data=self.data1)
+        self.position_layers = 0  # 平仓重置加仓层数
 
     def notify_trade(self, trade):
         if not self.p.verbose:
@@ -204,6 +264,7 @@ def run_strategy(data0, data1, data2, lookback_period, upper_quantile, lower_qua
     cerebro.addanalyzer(bt.analyzers.DrawDown)
     cerebro.addanalyzer(bt.analyzers.Returns)
     cerebro.addanalyzer(bt.analyzers.ROIAnalyzer, period=bt.TimeFrame.Days)
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer)
 
     # 运行回测
     results = cerebro.run()
@@ -214,12 +275,14 @@ def run_strategy(data0, data1, data2, lookback_period, upper_quantile, lower_qua
     drawdown = strat.analyzers.drawdown.get_analysis().get('max', {}).get('drawdown', 0)
     returns = strat.analyzers.returns.get_analysis().get('rnorm100', 0)
     roi = strat.analyzers.roianalyzer.get_analysis().get('roi100', 0)
+    trades = strat.analyzers.tradeanalyzer.get_analysis().get('total', 0)
     
     return {
         'sharpe': sharpe,
         'drawdown': drawdown,
         'returns': returns,
         'roi': roi,
+        'trades': trades,
         'params': {
             'period': lookback_period,
             'upper_quantile': upper_quantile,
@@ -232,7 +295,7 @@ def run_strategy(data0, data1, data2, lookback_period, upper_quantile, lower_qua
 def grid_search():
     """执行网格搜索找到最优参数"""
     # 读取数据
-    output_file = 'D:\\FutureData\\ricequant\\1d_2017to2024_noadjust.h5'
+    output_file = '/Users/f/Desktop/ricequant/1d_2017to2024_noadjust.h5'
     df0 = pd.read_hdf(output_file, key='/J').reset_index()
     df1 = pd.read_hdf(output_file, key='/JM').reset_index()
 
@@ -244,9 +307,9 @@ def grid_search():
     todate = datetime.datetime(2025, 1, 1)
 
     # 定义参数网格
-    lookback_periods = [30, 45, 60, 90, 120]
-    upper_quantiles = [0.8, 0.85, 0.9, 0.95]
-    spread_windows = [30, 60, 90]  # 新增：价差计算窗口参数
+    lookback_periods = [30]
+    upper_quantiles = [0.8]
+    spread_windows = [ 60]  # 新增：价差计算窗口参数
     
     # 为每个upper_quantile计算对应的lower_quantile
     param_combinations = []
@@ -279,7 +342,7 @@ def grid_search():
             results.append(result)
             
             # 打印当前结果
-            print(f"  夏普比率: {result['sharpe']:.4f}, 最大回撤: {result['drawdown']:.2f}%, 年化收益: {result['returns']:.2f}%")
+            print(f"  夏普比率: {result['sharpe']:.4f}, 最大回撤: {result['drawdown']:.2f}%, 年化收益: {result['returns']:.2f}%，交易次数: {result['trades']}")
         except Exception as e:
             print(f"  参数组合出错: {e}")
     
