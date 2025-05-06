@@ -26,8 +26,9 @@ def parse_args():
     parser.add_argument('--base_holding_days', type=int, default=5, help='基础持仓天数')
     parser.add_argument('--days_factor', type=float, default=5.0, help='持仓天数调整因子')
     parser.add_argument('--setcash', type=float, default=100000, help='初始资金')
-    parser.add_argument('--plot', type=lambda x: x.lower() == 'true', default=True, help='是否绘制结果(True/False)')
-    parser.add_argument('--setslippage', type=float, default=0.0, help='设置滑点率')
+    parser.add_argument('--plot', type=lambda x: x.lower() == 'true', default=False, help='是否绘制结果(True/False)')
+    parser.add_argument('--setslippage', type=float, default=0.0003, help='设置滑点率')
+    parser.add_argument('--commission', type=float, default=0.0003, help='设置手续费率')
     parser.add_argument('--export_csv', type=lambda x: x.lower() == 'true', default=False, help='是否导出回测数据到CSV(True/False)')
     
     return parser.parse_args()
@@ -308,10 +309,11 @@ def main():
                         base_holding_days=args.base_holding_days,
                         days_factor=args.days_factor)
 
-    # 设置初始资金和滑点
+    # 设置初始资金、滑点和手续费
     cerebro.broker.setcash(args.setcash)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.set_slippage_perc(args.setslippage)
+    cerebro.broker.set_slippage_perc(args.setslippage)  # 使用百分比滑点
+    cerebro.broker.setcommission(commission=args.commission)  # 设置手续费
     
     # 添加分析器
     cerebro.addanalyzer(bt.analyzers.DrawDown)  # 回撤分析器
@@ -376,7 +378,7 @@ def main():
         backtest_data = strategy.get_backtest_data()
         # 生成文件名
         params_str = f"win{args.win}_k{args.k_coeff}_h{args.h_coeff}_base{args.base_holding_days}_factor{args.days_factor}"
-        filename = f"outcome/CUSUM_backtest_{args.df0_key.replace('/', '')}{args.df1_key.replace('/', '')}_{params_str}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"outcome_slippage_com/CUSUM_backtest_{args.df0_key.replace('/', '')}{args.df1_key.replace('/', '')}_{params_str}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         # 保存CSV
         backtest_data.to_csv(filename, index=False)
         print(f"回测数据已保存至: {filename}")
